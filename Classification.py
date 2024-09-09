@@ -13,6 +13,7 @@ from pydicom.pixel_data_handlers.util import apply_voi_lut
 import warnings
 from numpy import ndarray
 from torchxrayvision.utils import normalize
+import json 
 # Argumentos do script
 parser = argparse.ArgumentParser()
 parser.add_argument('-weights', type=str, default="densenet121-res224-all", help='Modelo a ser utilizado.')
@@ -109,6 +110,7 @@ def read_xray_dcm(path: os.PathLike) -> ndarray:
 
 # Carregar o modelo
 model = xrv.models.get_model(cfg.weights)
+output_file = 'resultados.json'  # Nome do arquivo de saída
 
 if autenticar_orthanc():
     estudos = listar_estudos()
@@ -153,10 +155,11 @@ if autenticar_orthanc():
                             preds = model(img_tensor).cpu()
                             output = {"preds": dict(zip(xrv.datasets.default_pathologies, preds[0].detach().numpy()))}
                         
-                        # Exibir resultados
-                        if cfg.feats:
-                            pprint.pprint(output)
-                        else:
-                            print(f"\nInstância: {instance_id}")
-                            formatted_output = {'preds': output['preds']}
-                            pprint.pprint(formatted_output)
+                        # Escreve os resultados no arquivo .json
+                        with open(output_file, 'a') as f:
+                            # Converter os valores de float32 para float antes de salvar
+                            output['preds'] = {k: float(v) for k, v in output['preds'].items()}
+                            json.dump({instance_id: output}, f, indent=4)
+                            f.write("\n")  # Escreve uma nova linha após cada instância
+
+                        print(f"Resultados da instância {instance_id} salvos em {output_file}")
